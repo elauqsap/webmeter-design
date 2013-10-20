@@ -1,0 +1,361 @@
+
+<!DOCTYPE HTML>
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+        <title>Webmeter</title>
+        <!-- Bootstrap core CSS -->
+        <link href="bootstrap.css" rel="stylesheet">
+
+        <!-- Custom styles for this template -->
+        <link href="docs.css" rel="stylesheet">
+        <script type="text/javascript" src="jquery.min.js"></script>
+        <script src="js/highcharts.js"></script>
+        <script src="js/modules/exporting.js"></script>
+        <script type="text/javascript" src="jquery.min.js"></script>
+        <script type="text/javascript">
+
+var chart;
+var toggleState = 60; //default to 60s mode
+var continous = "OFF"; //default to OFF
+var togs = 60000;
+var temperature = 'C';
+var currentTemp;
+var page_tmp;
+
+function updateSize() {
+
+    $('.test').width($('#container').innerWidth());
+    $('#xaxis').width($('#container').innerWidth());
+
+}
+
+function toggle60() {
+    toggleState = 60;
+    //Highcharts.xAxis[0].update({max: x, min: (x - 60000)})
+    togs = 60000;
+    document.getElementById("graph60").className = "btn active";
+    document.getElementById("graph300").className = "btn btn-default";
+    $("#xaxis").attr("src","60.png");
+}
+
+function toggle300() {
+    toggleState = 300;
+    //Highcharts.xAxis[0].update({max: x, min: (x - 300000)})
+    togs = 300000;
+    document.getElementById("graph300").className = "btn active";
+    document.getElementById("graph60").className = "btn btn-default";
+    $("#xaxis").attr("src","300.png");
+
+}
+function toggleTemp() {
+
+    if(temperature == 'C'){
+        temperature = 'F';
+        // document.getElementById('currentTemp').innerHTML=page_tmp;
+
+    }
+    else if (temperature == 'F'){
+        temperature = 'C';
+        // document.getElementById('currentTemp').innerHTML=page_tmp;
+
+    }
+
+}
+function getCurrentTemp(point) {
+
+    if(temperature == 'F'){
+        var result = (point * (9/5)) + 32;
+        result = Math.round(result *100) /100;
+        console.log("F result is: "+result);
+        return result;
+
+    }
+    else {
+        return point
+    }
+
+
+}
+
+function toggleMode(state) {
+
+    if(continous != state){
+
+        var sendData = JSON.stringify({display: state});
+        console.log(sendData);
+
+        $.ajax({
+            url: "/json",
+            type: "post",
+            data: sendData
+        });
+
+        if(continous == 'OFF'){
+            document.getElementById("continuousBtnON").className = "btn active";
+            document.getElementById("continuousBtnOFF").className = "btn btn-default";
+            continous = 'ON';
+        }
+        else {
+            document.getElementById("continuousBtnOFF").className = "btn active";
+            document.getElementById("continuousBtnON").className = "btn btn-default";
+            continous = 'OFF';
+        }
+    }
+}
+
+$(function () {
+    function requestData() {
+        $.ajax({
+            url: '/get',
+            success: function(point) {
+
+                var str = eval("(function(){return "+point+";})()");
+                var tempPoint = str.temp;
+                console.log(tempPoint);
+                var errorStatus = str.err;
+                var srcStatus = str.src;
+
+                var data = Number(str.temp);
+                if(data > 80){
+                    page_tmp = "NaN";
+                }
+                else if(data < -100 || errorStatus == "Unplugged"){
+                    page_tmp = "NaN";
+                    data = "N";
+
+                }
+                else if(srcStatus == "PoE"){
+                    page_tmp = "NaN";
+                    data = "N";
+                    errorStatus = "No Battery"
+
+                }
+                else {
+                    page_tmp = getCurrentTemp(data) + "°" +temperature;
+                }
+
+
+                
+
+                currentTemp = document.getElementById('currentTemp').innerHTML=page_tmp;
+                var currentSrc = document.getElementById('currentSrc').innerHTML=srcStatus;
+                var currentStatus = document.getElementById('currentStatus').innerHTML=errorStatus;
+
+                var x = (new Date()).getTime();
+                chart.xAxis[0].update({max: x, min: (x - togs)})
+                chart.series[0].addPoint([x,data]);
+                setTimeout(requestData, 600);    
+            },
+            cache: false
+        });
+    }
+
+    $(document).ready(updateSize);
+    $(window).resize(updateSize);
+
+    $(document).ready(function() {
+        document.getElementById("continuousBtnOFF").className = "btn active"; //default button state
+        document.getElementById("graph60").className = "btn active";
+        Highcharts.setOptions({
+            global: {
+                useUTC: false
+            }
+        });
+
+        
+        chart = new Highcharts.Chart({
+            chart: {
+                renderTo: 'container',
+                type: 'line',
+                animation: Highcharts.svg, // don't animate in old IE
+                events: {
+                    load: requestData
+                    }
+                
+            },
+            title: {
+                text: 'Thermometer Readings'
+            },
+			xAxis: {
+            type: 'datetime',
+			title: {
+                    text: 'Time'
+                },
+            },
+
+            yAxis: {
+                min:10,
+                max:50,
+                title: {
+                    text: 'Temperature'
+                },
+                opposite:true,
+                plotLines: [{
+                    value: 0,
+                    width: 1,
+                    color: '#808080'
+                }]
+            },
+            tooltip: {
+                formatter: function() {
+                        return '<b>'+ "Arduino" +'</b><br/>'+
+                        Highcharts.dateFormat('%m-%Y %H:%M:%S', this.x);
+                }
+            },
+            legend: {
+                enabled: false
+            },
+            exporting: {
+                enabled: false
+            },
+        series: [{
+            data: []
+        }]
+        });
+    });
+    
+});
+    </script>
+    </head>
+
+    <header>
+
+            <div class ="header">
+              <div class="bs-header" id="content">
+                <div class="innerBox">
+              <div class="container">
+                <h1>Temperature Graph</h1>
+                <p>Principles of Electrical Engineering Design</p>
+
+                <div id="carbonards-container">
+                  <div class="carbonad" id="temp">
+
+                    <h4>Temperature</h4>
+                    <hr>
+
+                    <div id="currentTemp"></div>
+
+                  </div>
+
+                  <div class="carbonad" id="src">
+
+                    <h4>Source</h4>
+                    <hr>
+
+                    <div id="currentSrc"></div>
+
+                  </div>
+
+                  <div class="carbonad" id="status">
+
+                    <h4>Status</h4>
+                    <hr>
+
+                    <div id="currentStatus"></div>
+
+                  </div>
+
+                </div>
+
+              </div>
+            </div>
+            </div>
+         
+        </div>
+
+    </header>
+    <body>
+
+
+       <span>
+       <div class="jumbotron" id="graphBox" style="float:left; width:60%">
+            <div class="test"><img id="xaxis" src="60.png"></div>
+
+
+        <div id="container" style="min-width: 400px; height: 400px; margin: 0 auto">
+
+
+        </div>
+
+       </div>
+
+       <div class="jumbotron" id="settingsBox" style="float:right; width:40%">
+       
+        <div class="panel panel-default">
+          <div class="panel-heading">
+            <h3 class="panel-title">Graph Settings</h3>
+          </div>
+          <div class="panel-body">
+                
+                <div class="btn-group btn-group-lg">
+
+                    <button type="button" id="graph60" class="btn btn-default" onClick="toggle60()">60s Mode</button>
+                    <button type="button" id="graph300" class="btn btn-default" onClick="toggle300()">300s Mode</button>
+
+
+
+                </div>
+
+
+          </div>
+        </div>
+
+        <div class="panel panel-default">
+          <div class="panel-heading">
+            <h3 class="panel-title">Continuous Mode</h3>
+          </div>
+          <div class="panel-body">
+                
+                <div class="btn-group btn-group-lg">
+
+                    <button type="button" id="continuousBtnON" class="btn btn-default" onClick="toggleMode('ON')">ON</button>
+                    <button type="button" id="continuousBtnOFF" class="btn btn-default" onClick="toggleMode('OFF')">OFF</button>
+
+
+
+                </div>
+
+
+          </div>
+        </div>
+
+        <div class="panel panel-default">
+          <div class="panel-heading">
+            <h3 class="panel-title">Temperature: </h3>
+          </div>
+          <div class="panel-body">
+                
+                <div class="btn-group btn-group-lg">
+
+                    <button type="button" id="continuousBtnON" class="btn btn-default" onClick="toggleTemp()">Celcius</button>
+                    <button type="button" id="continuousBtnOFF" class="btn btn-default" onClick="toggleTemp()">Fahrenheit</button>
+
+
+
+                </div>
+
+
+          </div>
+        </div>
+
+       </div>
+
+
+   </span>
+
+
+
+       
+       <!--  
+    <input type="text" id="ip_addr" name="IP Address" value="192.168.0.253" />
+    <input type="button" id="submit" onclick="getIP()" value="Submit" />
+
+
+
+    <input type="button" onclick="display()" value="Turn on LED Display" />
+    <input type="button" onclick="get()" value="GET Request" />
+    <input type="text" id="get" name="get.php" value="" />
+    -->
+    </body>
+</html>
