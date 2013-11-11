@@ -241,7 +241,7 @@ String create_json()
 void get()
 {
   client.println("GET /display HTTP/1.1");
-  client.println("Host: 128.255.77.243:4567");
+  client.println("Host: 192.168.0.127:4567");
   client.println("Connection: close");
   client.println("");
 }
